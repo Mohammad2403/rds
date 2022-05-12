@@ -1,26 +1,31 @@
-resource "aws_security_group" "allow_tls" {
-  name        = "allow_tls"
-  description = "Allow TLS inbound traffic"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description      = "TLS from VPC"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = [aws_vpc.main.cidr_block]
-    ipv6_cidr_blocks = [aws_vpc.main.ipv6_cidr_block]
-  }
-
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  tags = {
-    Name = "allow_tls"
+data "aws_subnet_ids" "subnets" {
+  vpc_id = var.vpc_id
+}
+ 
+data "aws_subnet" "subnet_values" {
+  for_each = data.aws_subnet_ids.subnets.ids
+  id       = each.value
+}
+ 
+resource"aws_launch_configuration" "launch-configuration" {
+  name = var.launch_configuration_name
+  image_id = var.image_id
+  instance_type = var.instance_type
+}
+ 
+resource "aws_autoscaling_group" "autoscalling_group_config" {
+  name = var.auto_scalling_group_name
+  max_size = 3
+  min_size = 2
+  health_check_grace_period = 300
+  health_check_type = "EC2"
+  desired_capacity = 3
+  force_delete = true
+  vpc_zone_identifier = [for s in data.aws_subnet.subnet_values: s.id]
+ 
+  launch_configuration = aws_launch_configuration.launch-configuration.name
+ 
+  lifecycle {
+    create_before_destroy = true
   }
 }
